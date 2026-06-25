@@ -39,26 +39,6 @@ const kDarkHover             = Color(0x0DFFFFFF); // rgba(255,255,255,0.05)
 const kDarkBgSubtle          = Color(0x0AFFFFFF); // rgba(255,255,255,0.04)
 const kDarkBgMuted           = Color(0x12FFFFFF); // rgba(255,255,255,0.07)
 
-// ── 색상: 50대 친화 (century) ────────────────────────────────────────────────
-const kCenturyPageBg         = Color(0xFFF7F6F3);
-const kCenturyCardBg         = Color(0xFFFFFFFF);
-const kCenturyElevatedBg     = Color(0xFFEEECE8);
-const kCenturyInk            = Color(0xFF111111);
-const kCenturyBody           = Color(0xFF1E1E1E);
-const kCenturyBodySecondary  = Color(0xFF333333);
-const kCenturyMuted          = Color(0xFF666666);
-const kCenturyMutedStrong    = Color(0xFF444444);
-const kCenturyPrimary        = Color(0xFF1158D4);
-const kCenturyPrimaryActive  = Color(0xFF0D48B5);
-const kCenturyTradingUp      = Color(0xFFD40F1F);
-const kCenturyTradingDown    = Color(0xFF1158D4);
-const kCenturyHairline       = Color(0x2E000000); // rgba(0,0,0,0.18)
-const kCenturyBorder         = Color(0x24000000); // rgba(0,0,0,0.14)
-const kCenturyBorderMd       = Color(0x38000000); // rgba(0,0,0,0.22)
-const kCenturyHover          = Color(0x0D000000); // rgba(0,0,0,0.05)
-const kCenturyBgMuted        = Color(0x0F000000); // rgba(0,0,0,0.06)
-const kCenturyBgSubtle       = Color(0x08000000); // rgba(0,0,0,0.03)
-
 // ── 타이포 ────────────────────────────────────────────────────────────────────
 const kFontMono = TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
 
@@ -236,49 +216,6 @@ const _darkPalette = AppPalette(
   primaryActive: kPrimaryActive,
 );
 
-const _centuryPalette = AppPalette(
-  ink: kCenturyInk,
-  body: kCenturyBody,
-  bodySecondary: kCenturyBodySecondary,
-  muted: kCenturyMuted,
-  mutedStrong: kCenturyMutedStrong,
-  pageBg: kCenturyPageBg,
-  cardBg: kCenturyCardBg,
-  elevatedBg: kCenturyElevatedBg,
-  hairline: kCenturyHairline,
-  border: kCenturyBorder,
-  borderMd: kCenturyBorderMd,
-  hover: kCenturyHover,
-  bgSubtle: kCenturyBgSubtle,
-  bgMuted: kCenturyBgMuted,
-  tradingUp: kCenturyTradingUp,
-  tradingDown: kCenturyTradingDown,
-  primary: kCenturyPrimary,
-  primaryActive: kCenturyPrimaryActive,
-);
-
-// 다크 + century 동시 적용 시 다크 색이 우선 (web globals.css html.dark.century-old)
-const _darkCenturyPalette = AppPalette(
-  ink: kDarkInk,
-  body: kDarkBody,
-  bodySecondary: kDarkBodySecondary,
-  muted: kDarkMuted,
-  mutedStrong: kDarkMutedStrong,
-  pageBg: kDarkPageBg,
-  cardBg: kDarkCardBg,
-  elevatedBg: kDarkElevatedBg,
-  hairline: kDarkHairline,
-  border: kDarkBorder,
-  borderMd: kDarkBorderMd,
-  hover: kDarkHover,
-  bgSubtle: kDarkBgSubtle,
-  bgMuted: kDarkBgMuted,
-  tradingUp: kTradingUp,
-  tradingDown: kTradingDown,
-  primary: kPrimary,
-  primaryActive: kPrimaryActive,
-);
-
 // ── ThemeData ─────────────────────────────────────────────────────────────────
 ThemeData _buildTheme({
   required Brightness brightness,
@@ -418,9 +355,3 @@ ThemeData buildLightTheme() =>
 
 ThemeData buildDarkTheme() =>
     _buildTheme(brightness: Brightness.dark, palette: _darkPalette);
-
-ThemeData buildCenturyTheme() =>
-    _buildTheme(brightness: Brightness.light, palette: _centuryPalette);
-
-ThemeData buildDarkCenturyTheme() =>
-    _buildTheme(brightness: Brightness.dark, palette: _darkCenturyPalette);

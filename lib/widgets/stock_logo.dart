@@ -40,22 +40,22 @@ class StockLogo extends StatelessWidget {
     final c = _baseColor();
     final src = name ?? code;
     final initial = src.isNotEmpty ? src[0] : '?';
-    final radius = circle ? s / 2 : 10.0;
+    final radius = circle ? s / 2 : 16.0;
 
     return Container(
       width: s,
       height: s,
       decoration: BoxDecoration(
-        color: c.withAlpha(38),
+        color: c,
         borderRadius: BorderRadius.circular(radius),
       ),
       alignment: Alignment.center,
       child: Text(
         initial,
         style: TextStyle(
-          fontSize: s * 0.42,
+          fontSize: s * 0.38,
           fontWeight: FontWeight.w700,
-          color: c,
+          color: Colors.white,
           height: 1,
         ),
       ),
@@ -64,17 +64,23 @@ class StockLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = circle ? size / 2 : 10.0;
+    final radius = circle ? size / 2 : 16.0;
     final assetPath = 'assets/stocks/$code.png';
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      clipBehavior: Clip.hardEdge,
       child: Image.asset(
         assetPath,
         width: size,
         height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _avatar(),
+        fit: BoxFit.contain,
+        errorBuilder: (ctx, err, stack) => _avatar(),
       ),
     );
   }

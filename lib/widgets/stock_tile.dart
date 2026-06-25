@@ -246,16 +246,47 @@ class StockListHeader extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 8),
           if (extraLabel != null) ...[
-            Text(
-              extraLabel!,
-              style: TextStyle(fontSize: 10, color: palette.muted),
+            SizedBox(
+              width: 96,
+              child: Text(
+                extraLabel!,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: palette.muted,
+                  letterSpacing: 1.0,
+                ),
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+          ] else ...[
+            SizedBox(
+              width: 96,
+              child: Text(
+                priceLabel,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: palette.muted,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
           ],
-          Text(
-            changeLabel,
-            style: TextStyle(fontSize: 10, color: palette.muted),
+          SizedBox(
+            width: 88,
+            child: Text(
+              changeLabel,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 10,
+                color: palette.muted,
+                letterSpacing: 1.0,
+              ),
+            ),
           ),
         ],
       ),

@@ -8,8 +8,6 @@ import 'design/tokens.dart';
 import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
-import 'widgets/century_toggle.dart';
-import 'widgets/theme_toggle.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +23,8 @@ class StockApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(themeProvider);
     final isDark = theme.mode == AppThemeMode.dark;
-    final isCentury = theme.font == FontMode.century;
 
-    final selectedTheme = isDark
-        ? (isCentury ? buildDarkCenturyTheme() : buildDarkTheme())
-        : (isCentury ? buildCenturyTheme() : buildLightTheme());
+    final selectedTheme = isDark ? buildDarkTheme() : buildLightTheme();
 
     // 상태바 아이콘은 테마에 맞춰 매 빌드 시 갱신.
     SystemChrome.setSystemUIOverlayStyle(
@@ -46,33 +41,6 @@ class StockApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: selectedTheme,
       home: const _AuthGate(),
-      builder: (context, child) {
-        final mq = MediaQuery.of(context);
-        return MediaQuery(
-          // 웹 `html.century-old body { zoom: 1.3 }` 의 플러터 대응:
-          // 텍스트 스케일러 1.3배로 글자·기본 패딩을 함께 키운다.
-          data: mq.copyWith(
-            textScaler: isCentury
-                ? const TextScaler.linear(1.3)
-                : const TextScaler.linear(1.0),
-          ),
-          child: Stack(
-            children: [
-              child ?? const SizedBox.shrink(),
-              const Positioned(
-                right: 24,
-                bottom: 24,
-                child: ThemeToggle(),
-              ),
-              const Positioned(
-                right: 24,
-                bottom: 88,
-                child: CenturyToggle(),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

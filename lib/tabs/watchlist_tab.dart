@@ -10,6 +10,7 @@ import '../design/tokens.dart';
 import '../widgets/stock_tile.dart';
 import '../widgets/stock_logo.dart';
 import '../widgets/section_header.dart';
+import '../widgets/change_badge.dart';
 
 const _sortTabs = ['기본', '거래량', '거래대금', '외국인', '기관'];
 const _quickPicks = [
@@ -212,7 +213,7 @@ class _WatchlistTabState extends ConsumerState<WatchlistTab> {
                     ],
                   ),
                 ),
-                if (hasItems)
+                if (hasItems) ...[
                   SectionHeader(
                     tabs: _sortTabs.map((t) => Text(t)).toList(),
                     selectedIndex: _sortIndex,
@@ -220,8 +221,12 @@ class _WatchlistTabState extends ConsumerState<WatchlistTab> {
                       setState(() => _sortIndex = i);
                       _loadExtraSort(i);
                     },
-                  )
-                else
+                  ),
+                  const StockListHeader(
+                    priceLabel: '현재가',
+                    changeLabel: '등락률',
+                  ),
+                ] else
                   Container(height: 1, color: palette.border),
               ],
             ),
@@ -268,9 +273,6 @@ class _WatchlistTabState extends ConsumerState<WatchlistTab> {
                       item: item,
                       onTap: () => widget.onSelect(
                           item.stockCode, item.stockName ?? item.stockCode),
-                      onRemove: () async {
-                        await notifier.remove(item.stockCode);
-                      },
                     );
                   },
                 );
@@ -283,16 +285,14 @@ class _WatchlistTabState extends ConsumerState<WatchlistTab> {
   }
 }
 
-// ── 관심종목 행 (삭제 버튼 포함) ──────────────────────────────────────────────
+// ── 관심종목 행 ───────────────────────────────────────────────────────────────
 
 class _WatchlistTile extends StatelessWidget {
   final WatchlistItem item;
   final VoidCallback onTap;
-  final VoidCallback onRemove;
   const _WatchlistTile({
     required this.item,
     required this.onTap,
-    required this.onRemove,
   });
 
   String _fmtPrice(double p) => p
@@ -303,18 +303,6 @@ class _WatchlistTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final rate = item.changeRate;
-    final Color rateColor;
-    final Color rateBg;
-    if (rate != null && rate > 0) {
-      rateColor = palette.tradingUp;
-      rateBg = palette.tradingUp.withAlpha(26);
-    } else if (rate != null && rate < 0) {
-      rateColor = palette.tradingDown;
-      rateBg = palette.tradingDown.withAlpha(26);
-    } else {
-      rateColor = palette.muted;
-      rateBg = palette.bgMuted;
-    }
 
     return Material(
       color: Colors.transparent,
@@ -352,60 +340,42 @@ class _WatchlistTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  RichText(
-                    text: TextSpan(children: [
-                      TextSpan(
-                        text: item.price != null
-                            ? _fmtPrice(item.price!)
-                            : '—',
-                        style: monoStyle(size: 15, color: palette.ink),
-                      ),
-                      if (item.price != null)
-                        TextSpan(
-                          text: '원',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: palette.muted,
-                              fontWeight: FontWeight.w400),
-                        ),
-                    ]),
-                  ),
-                  const SizedBox(height: 3),
-                  if (rate != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          color: rateBg,
-                          borderRadius: BorderRadius.circular(9999)),
+              const SizedBox(width: 8),
+              // 현재가 — 헤더 width:96과 동일, 오른쪽 끝 정렬
+              SizedBox(
+                width: 96,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Flexible(
                       child: Text(
-                        '${rate > 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                        style: monoStyle(
-                            size: 13,
-                            color: rateColor,
-                            weight: FontWeight.w700),
+                        item.price != null ? _fmtPrice(item.price!) : '—',
+                        style: monoStyle(size: 15, color: palette.ink),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        softWrap: false,
                       ),
-                    )
-                  else
-                    Text('—',
-                        style: monoStyle(
-                            size: 13,
+                    ),
+                    if (item.price != null)
+                      Text(
+                        '원',
+                        style: TextStyle(
+                            fontSize: 11,
                             color: palette.muted,
-                            weight: FontWeight.w400)),
-                ],
+                            fontWeight: FontWeight.w400),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 4),
-              // 삭제 버튼
-              GestureDetector(
-                onTap: onRemove,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(Icons.close, size: 16, color: palette.muted),
+              const SizedBox(width: 8),
+              // 등락률 — 헤더 width:88과 동일
+              SizedBox(
+                width: 88,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ChangeBadge(rate: rate),
                 ),
               ),
             ],

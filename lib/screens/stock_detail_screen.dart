@@ -6,7 +6,6 @@ import '../api/endpoints.dart';
 import '../api/models.dart';
 import '../design/tokens.dart';
 import '../providers/watchlist_provider.dart';
-import '../widgets/change_badge.dart';
 import '../widgets/stock_logo.dart';
 
 // ── 숫자 포맷 ─────────────────────────────────────────────────────────────────
@@ -58,8 +57,9 @@ class StockDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<StockDetailScreen> createState() => _State();
 }
 
-class _State extends ConsumerState<StockDetailScreen> {
-  String _detailTab = 'chart';
+class _State extends ConsumerState<StockDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   String _period = '3M';
 
   ChartAnalysis? _chart;
@@ -84,6 +84,18 @@ class _State extends ConsumerState<StockDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      // 전망 분석(index 2) 탭 선택 시 자동 로드
+      if (_tabController.index == 2 && !_tabController.indexIsChanging) {
+        _loadOutlook();
+      }
+      // 유사 패턴(index 1) 탭 선택 시 자동 로드
+      if (_tabController.index == 1 && !_tabController.indexIsChanging) {
+        _loadSimilar();
+      }
+      if (mounted) setState(() {});
+    });
     fetchChart(widget.code)
         .then((d) {
           if (mounted) setState(() { _chart = d; _loadingChart = false; });
@@ -98,6 +110,12 @@ class _State extends ConsumerState<StockDetailScreen> {
         .catchError((_) {
           if (mounted) setState(() => _loadingQuote = false);
         });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSimilar() async {
@@ -192,48 +210,89 @@ class _State extends ConsumerState<StockDetailScreen> {
     final palette = AppPalette.of(context);
     return Container(
       color: palette.cardBg,
-      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 첫째 줄: 뒤로가기
           IconButton(
             icon: const Icon(Icons.chevron_left, size: 28),
             color: palette.ink,
             onPressed: () => Navigator.pop(context),
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 32),
           ),
-          StockLogo(code: widget.code, name: widget.name, size: 36),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // 둘째 줄: 로고 + 이름/코드 + 관심버튼
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 0, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(widget.name,
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: palette.ink),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                Text(widget.code,
-                    style: monoStyle(
-                        size: 11, color: palette.muted, weight: FontWeight.w400)),
+                StockLogo(code: widget.code, name: widget.name, size: 42),
+                const SizedBox(width: 12),
+                // 이름 + 코드 한 줄 (Expanded로 남은 공간 채움)
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: palette.ink,
+                            height: 1.2,
+                            letterSpacing: -0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.code,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: palette.mutedStrong,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 관심 버튼 — 오른쪽 끝 고정
+                GestureDetector(
+                  onTap: () async {
+                    final n = ref.read(watchlistProvider.notifier);
+                    if (n.contains(widget.code)) {
+                      await n.remove(widget.code);
+                    } else {
+                      await n.add(widget.code);
+                    }
+                    setState(() {});
+                  },
+                  child: Container(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: palette.bgSubtle,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      inWatchlist ? '★ 관심 해제' : '☆ 관심 추가',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: palette.body,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-          IconButton(
-            icon: Icon(
-              inWatchlist ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-              color: inWatchlist ? palette.primary : palette.muted,
-            ),
-            onPressed: () async {
-              final n = ref.read(watchlistProvider.notifier);
-              if (n.contains(widget.code)) {
-                await n.remove(widget.code);
-              } else {
-                await n.add(widget.code);
-              }
-              setState(() {});
-            },
           ),
         ],
       ),
@@ -246,71 +305,163 @@ class _State extends ConsumerState<StockDetailScreen> {
     final palette = AppPalette.of(context);
     return Container(
       color: palette.cardBg,
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
       child: _loadingQuote
           ? Container(
-              height: 40,
+              height: 44,
               decoration: BoxDecoration(
-                  color: palette.hairline, borderRadius: BorderRadius.circular(6)),
+                  color: palette.hairline,
+                  borderRadius: BorderRadius.circular(6)),
             )
           : _quote == null
               ? const SizedBox.shrink()
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RichText(
-                      text: TextSpan(children: [
-                        TextSpan(
-                          text: _fmt(_quote!.price),
-                          style: monoStyle(
-                              size: 30, color: palette.ink, weight: FontWeight.w800),
+                    // 가격 행 — 현재가+원+등락  |  52주 최고/최저
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // 왼쪽: 현재가 + 원 + 등락 (baseline 정렬)
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                _fmt(_quote!.price),
+                                style: TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
+                                  color: palette.ink,
+                                  height: 1.0,
+                                  letterSpacing: -0.5,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '원',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: palette.muted,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // 등락 (변동금액 + 변동률)
+                              Builder(builder: (ctx) {
+                                final q = _quote!;
+                                final up = q.change > 0;
+                                final zero = q.change == 0;
+                                final color = zero
+                                    ? palette.body
+                                    : up
+                                        ? palette.tradingUp
+                                        : palette.tradingDown;
+                                final sign = up ? '+' : '';
+                                return Text(
+                                  '$sign${_fmt(q.change)} ($sign${q.changeRate.toStringAsFixed(2)}%)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: color,
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
                         ),
-                        TextSpan(
-                          text: '원',
-                          style: TextStyle(fontSize: 14, color: palette.muted),
-                        ),
-                      ]),
+                        // 오른쪽: 52주 최고/최저 — 현재가 라인에 수직 중앙 정렬
+                        if (_quote!.w52High != null)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '52주 최고  ${_fmt(_quote!.w52High!)}',
+                                style: TextStyle(
+                                    fontSize: 10, color: palette.muted),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '52주 최저  ${_fmt(_quote!.w52Low!)}',
+                                style: TextStyle(
+                                    fontSize: 10, color: palette.muted),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    ChangeBadge(rate: _quote!.changeRate),
-                    const Spacer(),
-                    if (_quote!.w52High != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('52주 최고  ${_fmt(_quote!.w52High!)}',
-                              style: TextStyle(fontSize: 10, color: palette.muted)),
-                          Text('52주 최저  ${_fmt(_quote!.w52Low!)}',
-                              style: TextStyle(fontSize: 10, color: palette.muted)),
-                        ],
-                      ),
                   ],
                 ),
     );
   }
 
-  // ── 단일 스크롤 콘텐츠 ───────────────────────────────────────────────────────
+  // ── 탭바 + 콘텐츠 ───────────────────────────────────────────────────────────
 
   Widget _buildContent() {
     final palette = AppPalette.of(context);
-    final Widget body = switch (_detailTab) {
-      'similar' => _buildSimilarTab(),
-      'outlook' => _buildOutlookTab(),
-      _ => _buildChartTab(),
-    };
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
+    return Column(
       children: [
-        Container(height: 12, color: palette.pageBg),
+        // 탭바 (가이드 언더라인 스타일)
         Container(
-          color: palette.cardBg,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: _DetailTabBar(
-            active: _detailTab,
-            onSelect: (tab) => setState(() => _detailTab = tab),
+          decoration: BoxDecoration(
+            color: palette.cardBg,
+            border: Border(bottom: BorderSide(color: palette.border, width: 1)),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            labelPadding: const EdgeInsets.only(right: 24),
+            indicatorSize: TabBarIndicatorSize.label,
+            indicator: UnderlineTabIndicator(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(999),
+                topRight: Radius.circular(999),
+              ),
+              borderSide: BorderSide(color: palette.ink, width: 3),
+            ),
+            dividerColor: Colors.transparent,
+            labelColor: palette.ink,
+            unselectedLabelColor: palette.muted,
+            labelStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            tabs: const [
+              Tab(text: '차트 분석'),
+              Tab(text: '유사 패턴'),
+              Tab(text: '전망 분석'),
+            ],
           ),
         ),
-        body,
+        // 탭 콘텐츠
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildChartTab(),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildSimilarTab(),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildOutlookTab(),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -738,60 +889,6 @@ class _State extends ConsumerState<StockDetailScreen> {
 }
 
 // ── 기간 선택기 ───────────────────────────────────────────────────────────────
-
-class _DetailTabBar extends StatelessWidget {
-  final String active;
-  final ValueChanged<String> onSelect;
-  const _DetailTabBar({required this.active, required this.onSelect});
-
-  static const _items = [
-    ('chart', '차트 분석'),
-    ('similar', '유사 패턴'),
-    ('outlook', '전망 분석'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: palette.bgMuted,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: _items.map((item) {
-          final selected = active == item.$1;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onSelect(item.$1),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? palette.cardBg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: selected
-                      ? [BoxShadow(color: palette.border, blurRadius: 4)]
-                      : null,
-                ),
-                child: Text(
-                  item.$2,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    color: selected ? palette.ink : palette.mutedStrong,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
 
 class _PeriodSelector extends StatelessWidget {
   final String period;
