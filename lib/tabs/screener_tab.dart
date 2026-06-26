@@ -78,6 +78,14 @@ class _ScreenerTabState extends State<ScreenerTab> {
   bool _loading = false;
   bool _searched = false;
   int _sortIndex = 0;
+  final _scrollController = ScrollController();
+  final _resultKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   List<String> get _selected =>
       _conds.where((c) => c.selected).map((c) => c.id).toList();
@@ -101,6 +109,17 @@ class _ScreenerTabState extends State<ScreenerTab> {
         _results = res;
         _loading = false;
         _searched = true;
+      });
+      // 결과 영역으로 스무스 스크롤 (업종별 추천과 동일 패턴)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _resultKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        }
       });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
@@ -129,6 +148,7 @@ class _ScreenerTabState extends State<ScreenerTab> {
     return Container(
       color: palette.cardBg,
       child: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(kHeaderPaddingH, 16, kHeaderPaddingH, 28),
         children: [
           Text('DB 업데이트: —',
@@ -222,7 +242,7 @@ class _ScreenerTabState extends State<ScreenerTab> {
             ],
           ),
           if (_searched) ...[
-            const SizedBox(height: 18),
+            SizedBox(key: _resultKey, height: 18),
             Container(height: 1, color: palette.border),
             const SizedBox(height: 12),
             if (_results.isNotEmpty)
