@@ -27,20 +27,22 @@ String _pct(double a, double b) {
   return '${v >= 0 ? '+' : ''}${v.toStringAsFixed(1)}%';
 }
 
-String _userFacingError(Object error) {
+String _userFacingError(Object error, {String subject = '분석 결과'}) {
   if (error is DioException) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return '전망 분석 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.';
+        return '$subject 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.';
       case DioExceptionType.connectionError:
         return '서버에 연결하지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.';
+      case DioExceptionType.badResponse:
+        return '$subject 를 불러오지 못했어요. 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       default:
         break;
     }
   }
-  return '분석 결과를 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+  return '$subject 를 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
 }
 
 const _periodOptions = ['1W', '1M', '3M', '6M', '1Y'];
@@ -152,7 +154,7 @@ class _State extends ConsumerState<StockDetailScreen>
       );
       if (mounted) setState(() { _similar = d; _loadingSimilar = false; });
     } catch (e) {
-      if (mounted) setState(() { _loadingSimilar = false; _similarError = '$e'; });
+      if (mounted) setState(() { _loadingSimilar = false; _similarError = _userFacingError(e, subject: '유사 패턴'); });
     }
   }
 
@@ -163,7 +165,7 @@ class _State extends ConsumerState<StockDetailScreen>
       final d = await fetchOutlook(widget.code);
       if (mounted) setState(() { _outlook = d; _loadingOutlook = false; });
     } catch (e) {
-      if (mounted) setState(() { _loadingOutlook = false; _outlookError = _userFacingError(e); });
+      if (mounted) setState(() { _loadingOutlook = false; _outlookError = _userFacingError(e, subject: '전망 분석'); });
     }
   }
 
@@ -844,45 +846,35 @@ class _State extends ConsumerState<StockDetailScreen>
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_outlook!.score != null)
-          _FinalVerdictCard(
-            score: _outlook!.score!,
-            summary: _outlook!.summary,
-            aiSummary: _outlook!.aiSignals.isNotEmpty
-                ? _outlook!.aiSignals.first.summary
-                : null,
-            confidence: _outlook!.aiSignals.isNotEmpty
-                ? _outlook!.aiSignals.first.confidence
-                : null,
-          ),
-        if (_outlook!.aiSignals.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _SignalListCard(
-              title: 'AI 분석',
-              items: _outlook!.aiSignals
-                  .map((s) => _SigItem(s.label, s.direction, s.summary))
-                  .toList()),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_outlook!.score != null)
+            _FinalVerdictCard(
+              score: _outlook!.score!,
+              summary: _outlook!.summary,
+              aiSummary: _outlook!.aiSignals.isNotEmpty
+                  ? _outlook!.aiSignals.first.summary
+                  : null,
+              confidence: _outlook!.aiSignals.isNotEmpty
+                  ? _outlook!.aiSignals.first.confidence
+                  : null,
+            ),
+          if (_outlook!.quantSignals.isNotEmpty ||
+              _outlook!.financialSignals.isNotEmpty ||
+              _outlook!.aiSignals.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _QuantSignalsTable(
+              quant: _outlook!.quantSignals,
+              financial: _outlook!.financialSignals,
+              ai: _outlook!.aiSignals,
+            ),
+          ],
+          if (_outlook!.evidence.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _EvidenceList(evidence: _outlook!.evidence),
+          ],
+          const SizedBox(height: 16),
         ],
-        if (_outlook!.quantSignals.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _SignalListCard(
-              title: '정량 신호',
-              items: _outlook!.quantSignals
-                  .map((s) => _SigItem(s.label, s.direction, s.value))
-                  .toList()),
-        ],
-        if (_outlook!.financialSignals.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _SignalListCard(
-              title: '재무 신호',
-              items: _outlook!.financialSignals
-                  .map((s) => _SigItem(s.label, s.direction, s.reason))
-                  .toList()),
-        ],
-        const SizedBox(height: 16),
-      ],
       ),
     );
   }
@@ -1458,31 +1450,252 @@ class _ScoreBar extends StatelessWidget {
   }
 }
 
-// ── 시그널 목록 카드 ──────────────────────────────────────────────────────────
+// ── 신호 상세 표 (아코디언) ────────────────────────────────────────────────────
 
-class _SigItem {
-  final String label;
+class _SignalRow {
+  final String key;
   final String direction;
+  final int score;
+  final String source;
+  final String title;
+  final String value;
   final String? detail;
-  _SigItem(this.label, this.direction, this.detail);
+  _SignalRow({
+    required this.key,
+    required this.direction,
+    required this.score,
+    required this.source,
+    required this.title,
+    required this.value,
+    this.detail,
+  });
 }
 
-class _SignalListCard extends StatelessWidget {
-  final String title;
-  final List<_SigItem> items;
-  const _SignalListCard({required this.title, required this.items});
+class _QuantSignalsTable extends StatefulWidget {
+  final List<QuantSignal> quant;
+  final List<FinancialSignal> financial;
+  final List<AISignal> ai;
+  const _QuantSignalsTable({
+    required this.quant,
+    required this.financial,
+    required this.ai,
+  });
 
-  Color _dc(String d, AppPalette palette) => d == 'positive'
-      ? palette.tradingUp
-      : d == 'negative'
-          ? palette.tradingDown
-          : palette.muted;
+  @override
+  State<_QuantSignalsTable> createState() => _QuantSignalsTableState();
+}
 
-  IconData _di(String d) => d == 'positive'
-      ? Icons.arrow_upward
-      : d == 'negative'
-          ? Icons.arrow_downward
-          : Icons.remove;
+class _QuantSignalsTableState extends State<_QuantSignalsTable> {
+  String? _openKey;
+
+  String _fmtNum(String? v) {
+    if (v == null || v.isEmpty) return '—';
+    return v;
+  }
+
+  List<_SignalRow> _buildRows() => [
+        ...widget.quant.asMap().entries.map((e) => _SignalRow(
+              key: 'q-${e.key}',
+              direction: e.value.direction,
+              score: e.value.score,
+              source: 'quant',
+              title: e.value.label,
+              value: _fmtNum(e.value.value),
+              detail: _quantDetail(e.value.label),
+            )),
+        ...widget.financial.asMap().entries.map((e) => _SignalRow(
+              key: 'f-${e.key}',
+              direction: e.value.direction,
+              score: e.value.score,
+              source: 'financial',
+              title: e.value.label,
+              value: '—',
+              detail: e.value.reason,
+            )),
+        ...widget.ai.asMap().entries.map((e) => _SignalRow(
+              key: 'a-${e.key}',
+              direction: e.value.direction,
+              score: e.value.score,
+              source: 'gpt',
+              title: 'LLM: ${e.value.label}',
+              value: e.value.confidence != null
+                  ? 'conf ${(e.value.confidence! * 100).toStringAsFixed(0)}%'
+                  : '—',
+              detail: e.value.summary,
+            )),
+      ];
+
+  String _quantDetail(String label) {
+    if (label.contains('골든크로스')) return '단기(MA5) > 장기(MA20) 상향 돌파(+2) / 하향 돌파(-2)';
+    if (label.contains('이격도')) return '현재가 / MA20 × 100. <90 과매도(+2), >110 과매수(-2)';
+    if (label.contains('모멘텀')) return '60일 수익률. ≥+30%(+1) / ≤-20%(-1) / 그 외 중립';
+    if (label.contains('외인') || label.contains('외국인')) return '최근 3 거래일 외국인 순매수 합. >0 positive(+2), <0 negative(-2)';
+    if (label.contains('거래량')) return '당일 거래량 / 20일 평균. ≥2.0 급증(+1), ≤0.5 위축(-1)';
+    return '상세 정보 없음';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final rows = _buildRows();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: palette.hairline)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('신호 상세 표',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: palette.ink)),
+                const SizedBox(height: 4),
+                Text('행을 탭하면 계산 근거를 펼쳐볼 수 있습니다.',
+                    style: TextStyle(fontSize: 12, color: palette.mutedStrong)),
+              ],
+            ),
+          ),
+          // 행 목록
+          ...rows.map((row) => _buildRow(row, palette)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRow(_SignalRow row, AppPalette palette) {
+    final isOpen = _openKey == row.key;
+    final scoreColor = row.score > 0
+        ? palette.tradingUp
+        : row.score < 0
+            ? palette.tradingDown
+            : palette.muted;
+    final dirColor = row.direction == 'positive'
+        ? palette.tradingUp
+        : row.direction == 'negative'
+            ? palette.tradingDown
+            : palette.muted;
+    final dirGlyph = row.direction == 'positive'
+        ? '▲'
+        : row.direction == 'negative'
+            ? '▼'
+            : '·';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _openKey = isOpen ? null : row.key),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: palette.hairline)),
+            ),
+            child: Row(
+              children: [
+                // 방향 글리프 24px
+                SizedBox(
+                  width: 20,
+                  child: Text(dirGlyph,
+                      style: TextStyle(fontSize: 12, color: dirColor)),
+                ),
+                // 출처 120px
+                SizedBox(
+                  width: 90,
+                  child: Text(row.source,
+                      style: monoStyle(size: 11, color: palette.mutedStrong),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                // 이름 (flex)
+                Expanded(
+                  child: Text(row.title,
+                      style: TextStyle(fontSize: 13, color: palette.ink),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                // 값 80px
+                SizedBox(
+                  width: 80,
+                  child: Text(row.value,
+                      style: monoStyle(size: 12, color: palette.body),
+                      textAlign: TextAlign.right,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 12),
+                // 점수 + 화살표
+                SizedBox(
+                  width: 52,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${row.score > 0 ? '+' : ''}${row.score}',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: scoreColor,
+                            fontFeatures: const [FontFeature.tabularFigures()]),
+                      ),
+                      const SizedBox(width: 6),
+                      AnimatedRotation(
+                        turns: isOpen ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Text('▶',
+                            style:
+                                TextStyle(fontSize: 9, color: palette.muted)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isOpen && row.detail != null && row.detail!.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.bgSubtle,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: palette.border),
+            ),
+            child: Text(
+              row.detail!,
+              style: TextStyle(
+                  fontSize: 12, color: palette.mutedStrong, height: 1.6),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── 근거 자료 목록 ─────────────────────────────────────────────────────────────
+
+class _EvidenceList extends StatelessWidget {
+  final List<Evidence> evidence;
+  const _EvidenceList({required this.evidence});
+
+  static const _kindLabel = {
+    'news': '뉴스',
+    'disclosure': '공시',
+    'financial': '재무',
+    'market': '시장',
+    'quant': '퀀트',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1493,56 +1706,100 @@ class _SignalListCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: palette.border),
       ),
+      clipBehavior: Clip.hardEdge,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-            child: Text(title,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: palette.ink)),
+          // 헤더
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: palette.hairline)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('근거 자료',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: palette.ink)),
+                Text('${evidence.length}건',
+                    style: monoStyle(size: 12, color: palette.muted)),
+              ],
+            ),
           ),
-          ...items.asMap().entries.map((e) {
-            final s = e.value;
-            return Container(
-              decoration: BoxDecoration(
-                  border: Border(
-                      top: BorderSide(
-                          color: e.key == 0 ? Colors.transparent : palette.border))),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(_di(s.direction), size: 14, color: _dc(s.direction, palette)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(s.label,
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: palette.ink)),
-                        if (s.detail != null && s.detail!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(s.detail!,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: palette.body,
-                                    height: 1.4)),
-                          ),
-                      ],
+          // 항목 목록
+          ...evidence.map((item) => Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  border:
+                      Border(top: BorderSide(color: palette.hairline)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 종류 뱃지
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: palette.bgSubtle,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _kindLabel[item.kind] ?? item.kind,
+                        style:
+                            monoStyle(size: 11, color: palette.muted),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                    const SizedBox(width: 12),
+                    // 제목 + 출처 + 날짜
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: item.url != null
+                                  ? palette.primary
+                                  : palette.ink,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (item.source.isNotEmpty)
+                                Text(item.source,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: palette.mutedStrong)),
+                              if (item.publishedAt != null &&
+                                  item.publishedAt!.length >= 10) ...[
+                                const SizedBox(width: 10),
+                                Text(
+                                  item.publishedAt!.substring(0, 10),
+                                  style: monoStyle(
+                                      size: 11,
+                                      color: palette.mutedStrong),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )),
         ],
       ),
     );

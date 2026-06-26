@@ -314,6 +314,33 @@ class FinancialSignal {
       );
 }
 
+class Evidence {
+  final String evidenceId;
+  final String kind; // 'news' | 'disclosure' | 'financial' | 'market' | 'quant'
+  final String source;
+  final String title;
+  final String? publishedAt;
+  final String? url;
+
+  Evidence({
+    required this.evidenceId,
+    required this.kind,
+    required this.source,
+    required this.title,
+    this.publishedAt,
+    this.url,
+  });
+
+  factory Evidence.fromJson(Map<String, dynamic> j) => Evidence(
+        evidenceId: (j['evidence_id'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'quant',
+        source: (j['source'] as String?) ?? '',
+        title: (j['title'] as String?) ?? '',
+        publishedAt: j['published_at'] as String?,
+        url: j['url'] as String?,
+      );
+}
+
 class OutlookReport {
   final String stockCode;
   final String? stockName;
@@ -323,6 +350,7 @@ class OutlookReport {
   final List<QuantSignal> quantSignals;
   final List<AISignal> aiSignals;
   final List<FinancialSignal> financialSignals;
+  final List<Evidence> evidence;
   final MarketQuote? marketQuote;
 
   OutlookReport({
@@ -334,6 +362,7 @@ class OutlookReport {
     required this.quantSignals,
     required this.aiSignals,
     required this.financialSignals,
+    this.evidence = const [],
     this.marketQuote,
   });
 
@@ -353,6 +382,9 @@ class OutlookReport {
             .toList(),
         financialSignals: (j['financial_signals'] as List? ?? [])
             .map((e) => FinancialSignal.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        evidence: (j['evidence'] as List? ?? [])
+            .map((e) => Evidence.fromJson(e as Map<String, dynamic>))
             .toList(),
         marketQuote: j['market_quote'] != null
             ? MarketQuote.fromJson(j['market_quote'] as Map<String, dynamic>)
