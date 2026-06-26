@@ -6,6 +6,7 @@ import '../api/endpoints.dart';
 import '../api/models.dart';
 import '../design/tokens.dart';
 import '../providers/watchlist_provider.dart';
+import '../utils/url_opener.dart';
 import '../widgets/stock_logo.dart';
 
 // ── 숫자 포맷 ─────────────────────────────────────────────────────────────────
@@ -1697,6 +1698,24 @@ class _EvidenceList extends StatelessWidget {
     'quant': '퀀트',
   };
 
+  Future<void> _openUrl(BuildContext context, String? rawUrl) async {
+    if (rawUrl == null || rawUrl.isEmpty) return;
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || !uri.hasScheme) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('열 수 없는 링크입니다.')),
+      );
+      return;
+    }
+
+    final opened = await openExternalUrl(uri.toString());
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('원문 링크를 열지 못했어요.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -1732,7 +1751,9 @@ class _EvidenceList extends StatelessWidget {
             ),
           ),
           // 항목 목록
-          ...evidence.map((item) => Container(
+          ...evidence.map((item) => InkWell(
+                onTap: item.url == null ? null : () => _openUrl(context, item.url),
+                child: Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 24, vertical: 14),
                 decoration: BoxDecoration(
@@ -1798,6 +1819,7 @@ class _EvidenceList extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
                 ),
               )),
         ],
