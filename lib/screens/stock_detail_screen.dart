@@ -1367,7 +1367,9 @@ class _FinalVerdictCard extends StatelessWidget {
           // ── 점수 바 ──
           Container(
             decoration: BoxDecoration(
-              color: palette.bgSubtle.withAlpha(128),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1B1F25)
+                  : const Color(0xFFFBFBFC),
               border: Border(top: BorderSide(color: palette.border)),
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
