@@ -1,5 +1,5 @@
 name: stock_app
-description: "Quantum Electronics - 개인투자자를 위한 투자 리서치 앱"
+description: "QUVA - 개인투자자를 위한 투자 리서치 앱"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -41,9 +41,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
   assets:
     - .env
     - assets/stocks/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "quva_logo.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  web:
+    generate: false
